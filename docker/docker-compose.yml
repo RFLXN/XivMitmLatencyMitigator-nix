@@ -1,0 +1,28 @@
+name: xivmitm-latency-mitigator
+
+services:
+  xivmitm:
+    container_name: ${XIVMITM_CONTAINER_NAME:-xivmitm}
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        XIVMITM_REPO: ${XIVMITM_REPO:-https://github.com/Soreepeong/XivMitmLatencyMitigator.git}
+        XIVMITM_REV: ${XIVMITM_REV:-2ddfb8c3310782dbb7baaecdab17fc9c89ccce90}
+    network_mode: host
+    init: true
+    restart: unless-stopped
+    working_dir: /data
+    volumes:
+      - ${XIVMITM_DATA_DIR:-./data}:/data
+      - ${FFXIV_DX11_EXE:?Set FFXIV_DX11_EXE to your ffxiv_dx11.exe path}:/data/ffxiv_dx11.exe:ro
+    command:
+      - --directory
+      - /data
+      - --listen
+      - ${XIVMITM_LISTEN:-0.0.0.0:10514}
+      - --firewall
+      - none
+      - --measure-ping
+      - --web-statistics
+
