@@ -1,6 +1,6 @@
 .direnv/
 .env
 .xivmitm-data/
+/data/
 result
 result-*
-
