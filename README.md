@@ -57,6 +57,8 @@ Set `runContainer = false` if you want Nix to manage only sysctls and iptables w
 ```
 
 The client module adds systemd-managed routes for the FFXIV server ranges through the gateway.
+On NetworkManager systems, it also installs a dispatcher hook that reapplies the routes when the
+selected interface comes back up or receives DHCP/connectivity updates.
 
 ## Raw Docker Compose
 
@@ -115,4 +117,3 @@ docker logs -f xivmitm
 ```
 
 When FFXIV is connected and actions are used in-game, the logs should show game connections plus action/effect packet lines.
-

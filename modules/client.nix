@@ -6,6 +6,7 @@
 }:
 let
   cfg = config.services.xivMitmLatencyMitigator.client;
+  ip = "${pkgs.iproute2}/bin/ip";
 
   defaultRanges = [
     "119.252.36.0/24"
@@ -16,12 +17,31 @@ let
   ];
 
   routeUp = lib.concatMapStringsSep "\n" (range: ''
-    ip route replace ${range} via ${cfg.gateway} dev ${cfg.interface}
+    ${ip} route replace ${range} via ${cfg.gateway} dev ${cfg.interface}
   '') cfg.ranges;
 
   routeDown = lib.concatMapStringsSep "\n" (range: ''
-    ip route del ${range} via ${cfg.gateway} dev ${cfg.interface} 2>/dev/null || true
+    ${ip} route del ${range} via ${cfg.gateway} dev ${cfg.interface} 2>/dev/null || true
   '') cfg.ranges;
+
+  applyRoutes = pkgs.writeShellScript "xivmitm-client-routes-apply" routeUp;
+  removeRoutes = pkgs.writeShellScript "xivmitm-client-routes-remove" routeDown;
+
+  networkManagerDispatcher = pkgs.writeShellScript "xivmitm-client-routes-networkmanager" ''
+    iface="''${DEVICE_IFACE:-''${1:-}}"
+    action="''${2:-}"
+
+    [ "$iface" = "${cfg.interface}" ] || exit 0
+
+    case "$action" in
+      up|dhcp4-change|connectivity-change)
+        ${applyRoutes}
+        ;;
+      down|pre-down)
+        ${removeRoutes}
+        ;;
+    esac
+  '';
 in
 {
   options.services.xivMitmLatencyMitigator.client = {
@@ -56,6 +76,13 @@ in
 
     environment.systemPackages = [ pkgs.iproute2 ];
 
+    networking.networkmanager.dispatcherScripts = [
+      {
+        type = "basic";
+        source = networkManagerDispatcher;
+      }
+    ];
+
     systemd.services.xivmitm-latency-mitigator-client-routes = {
       description = "Route FFXIV traffic through the XivMitmLatencyMitigator gateway";
       wantedBy = [ "multi-user.target" ];
@@ -69,8 +96,12 @@ in
         RemainAfterExit = true;
       };
 
-      script = routeUp;
-      preStop = routeDown;
+      script = ''
+        ${applyRoutes}
+      '';
+      preStop = ''
+        ${removeRoutes}
+      '';
     };
   };
 }
